@@ -5,7 +5,18 @@ const ACCOUNT_PARAM = '__account__'
 
 class PatchedResponse extends Response {
   constructor(private readonly response: Response) {
-    super(response.body, response)
+    // HTTP status codes that cannot have a body
+    const statusesWithoutBody = [204, 304]
+    const shouldHaveBody = !statusesWithoutBody.includes(response.status)
+    
+    const body = shouldHaveBody ? response.body : null
+    const init: ResponseInit = {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    }
+    
+    super(body, init)
   }
 
   get url() {
