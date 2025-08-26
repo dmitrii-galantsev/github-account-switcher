@@ -19,24 +19,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node (with pnpm cache)
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
+          node-version: 20
+          cache: 'npm'
 
-      - name: Enable corepack & set pnpm version
-        run: |
-          corepack enable
-          corepack prepare pnpm@9.0.0 --activate
-          pnpm --version
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install dependencies (npm ci)
+        run: npm ci || npm install
 
       - name: Build (Chrome + Firefox packages)
-        run: pnpm build
+        run: npm run build
 
       - name: Read package version
         id: pkg
