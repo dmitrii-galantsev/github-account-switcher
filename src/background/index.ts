@@ -129,24 +129,53 @@ function watchAutoSwitchRequests() {
   )
 }
 
+// Some enterprise / SAML (Okta) flows set additional cookies (e.g. _gh_sso) without
+// changing the dotcom_user cookie. Previously we only synced account cookies when
+// dotcom_user changed, so the saved snapshot missed SSO cookies; restoring the old
+// snapshot caused GitHub to repeatedly demand SSO re-auth (loop). We now also
+// re-sync on changes to a set of auth-related cookies, debounced to avoid bursts.
 function watchCookies() {
+  const AUTH_COOKIES = new Set([
+    'dotcom_user', // primary username cookie
+    'user_session', // session identifier
+    '_gh_sso', // SSO session marker (enterprise)
+    'logged_in', // login state flag
+  ])
+
+  let syncTimer: number | undefined
+  function scheduleSync() {
+    if (syncTimer) {
+      clearTimeout(syncTimer)
+    }
+    // Debounce multiple rapid cookie updates during login / SSO handshake
+    syncTimer = setTimeout(() => {
+      syncAccounts().catch((e) => console.warn('Failed to sync accounts after auth cookie change', e))
+      syncTimer = undefined
+    }, 300) as unknown as number
+  }
+
   browser.cookies.onChanged.addListener(async (changeInfo) => {
-    const { cookie, removed } = changeInfo
-    // Ignore other cookies
-    if (cookie.name !== 'dotcom_user') {
+    const { cookie: changedCookie, removed } = changeInfo
+
+    if (!AUTH_COOKIES.has(changedCookie.name)) {
       return
     }
 
     if (removed) {
-      if (cookie.name === 'dotcom_user') {
+      if (changedCookie.name === 'dotcom_user') {
         console.info('dotcom_user cookie removed')
         await setBadgeText('...')
       }
+      // If the username is removed we can't really sync until it's set again.
       return
     }
 
-    console.info('New dotcom_user cookie', cookie.value)
-    await syncAccounts()
+    if (changedCookie.name === 'dotcom_user') {
+      console.info('New dotcom_user cookie', changedCookie.value)
+    } else {
+      console.info('Auth-related cookie changed', changedCookie.name)
+    }
+    scheduleSync()
   })
 }
 

@@ -1,10 +1,12 @@
 import cpy from 'cpy'
 import { deleteAsync } from 'del'
 import fs from 'fs/promises'
-import { join } from 'path'
+import path, { join } from 'path'
+import { fileURLToPath } from 'url'
 import AdmZip from 'adm-zip'
 
-const __dirname = new URL('.', import.meta.url).pathname
+// Use fileURLToPath to correctly resolve directory on Windows (avoid C:\C:\ prefix)
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // Convert Chrome manifest V3 to Firefox manifest V2
 async function buildFirefox() {

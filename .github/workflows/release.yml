@@ -1,0 +1,83 @@
+name: Build & Release Extension
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write  # needed to create releases
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (Chrome + Firefox packages)
+        run: pnpm build
+
+      - name: Read package version
+        id: pkg
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo Using version $VERSION
+
+      - name: Compute metadata
+        id: meta
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          TAG="v${{ steps.pkg.outputs.version }}-${GITHUB_RUN_NUMBER}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          NAME="Release v${{ steps.pkg.outputs.version }} (#${GITHUB_RUN_NUMBER}, $SHORT_SHA)"
+          echo "name=$NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          prerelease: false
+          draft: false
+          files: |
+            release/chrome.zip
+            release/firefox.zip
+          body: |
+            Automated build from commit ${{ github.sha }}.
+            Version: ${{ steps.pkg.outputs.version }}
+            Short SHA: ${{ steps.meta.outputs.short_sha }}
+            Generated on: ${{ github.event.head_commit.timestamp || github.run_started_at }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifacts (for debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output-${{ steps.meta.outputs.short_sha }}
+          path: |
+            dist/**
+            dist_firefox/**
+            release/**
+          if-no-files-found: warn

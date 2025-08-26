@@ -59,17 +59,29 @@ async function upsert(accountName: string, cookies: Cookie[]) {
 }
 
 async function switchTo(accountName: string) {
+  // If already on this account, avoid clearing cookies which could invalidate
+  // an ongoing SAML / Okta session establishment.
+  const current = await browser.cookies.get({ url: 'https://github.com', name: 'dotcom_user' })
+  if (current?.value === accountName) {
+    console.info('switchTo: already active account, skipping cookie reset')
+    return
+  }
+
   await cookie.clear()
 
   const account = await find(accountName)
   const cookies = account?.cookies || []
-  for (const cookie of cookies) {
-    const { hostOnly, domain, session, ...rest } = cookie
-    await browser.cookies.set({
-      url: 'https://github.com',
-      domain: hostOnly ? undefined : domain,
-      ...rest,
-    })
+  for (const c of cookies) {
+    const { hostOnly, domain, session, ...rest } = c
+    try {
+      await browser.cookies.set({
+        url: 'https://github.com',
+        domain: hostOnly ? undefined : domain,
+        ...rest,
+      })
+    } catch (e) {
+      console.warn('Failed to restore cookie', c.name, e)
+    }
   }
 
   if (cookies.length) {

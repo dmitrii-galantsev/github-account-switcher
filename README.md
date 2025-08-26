@@ -50,6 +50,15 @@ When you visit your enterprise GitHub URL, you want to automatically switch to y
 
 This extension will save the cookies of your GitHub accounts in the extension's local storage. When you switch to an account, the extension will load the cookies from the local storage and restore them in the browser. When you visit a GitHub URL, the extension will check if the URL matches any Auto Switching Rules. If so, the extension will automatically switch to the specified account.
 
+### About SAML / SSO (Okta) Enabled Accounts
+
+Some enterprise GitHub accounts require an additional SAML / SSO (e.g. Okta) handshake. Earlier versions of the extension only updated the stored cookie snapshot when the `dotcom_user` cookie changed, which meant SSO specific cookies (e.g. `_gh_sso`) were sometimes missing from the saved account. Restoring an outdated snapshot could then trigger an infinite redirect / re‑auth loop. The extension now:
+
+- Watches additional auth related cookies (`user_session`, `_gh_sso`, `logged_in`) and re-syncs the stored snapshot with debouncing.
+- Avoids clearing & re‑writing cookies if you switch to the account that is already active (preventing disruption of an in‑progress SSO flow).
+
+If you still encounter a loop, try: (1) open GitHub, (2) manually complete the SSO prompt once, (3) click the extension popup so it re-syncs (or sign out/in), then switch accounts again.
+
 ## Privacy
 
 This extension does not collect any personal information. All data is stored locally in the extension's local storage.
