@@ -19,16 +19,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node (with pnpm cache)
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
+      - name: Enable corepack & set pnpm version
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+          pnpm --version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -67,7 +69,7 @@ jobs:
             Automated build from commit ${{ github.sha }}.
             Version: ${{ steps.pkg.outputs.version }}
             Short SHA: ${{ steps.meta.outputs.short_sha }}
-            Generated on: ${{ github.event.head_commit.timestamp || github.run_started_at }}
+            Generated on: ${{ github.event.head_commit.timestamp }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
